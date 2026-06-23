@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>活力早餐 - 經營管理大數據</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .low-stock { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen pb-10">
+    <nav class="bg-slate-900 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold tracking-wider text-orange-400">🍳 經營後台系統</h1>
+            <div class="flex gap-3">
+                <button id="toggle-shop-btn" onclick="toggleShop()" class="px-6 py-1.5 rounded-full font-black text-xs transition"></button>
+                <input type="date" id="date-filter" class="bg-slate-800 border-none rounded-lg px-3 py-1 text-sm outline-none text-white">
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4 lg:p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-blue-500">
+                <p class="text-gray-400 font-bold text-[10px]">今日營收/訂單</p>
+                <div class="flex items-baseline gap-2"><span class="text-2xl font-black text-slate-800">$<span id="daily-rev">0</span></span><span class="text-xs text-blue-500 font-bold"><span id="daily-count">0</span>筆</span></div>
+                <p class="text-[10px] text-emerald-600 mt-1 font-bold">預估淨收入: $<span id="daily-net">0</span></p>
+            </div>
+            <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-emerald-500">
+                <p class="text-gray-400 font-bold text-[10px]">本月營收</p>
+                <div class="text-2xl font-black text-slate-800">$<span id="monthly-rev">0</span></div>
+                <p class="text-[10px] text-emerald-600 mt-1 font-bold">預估淨收入: $<span id="monthly-net">0</span></p>
+            </div>
+            <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-red-400">
+                <p class="text-gray-400 font-bold text-[10px]">本月材料成本</p>
+                <div class="text-2xl font-black text-red-500">$<span id="monthly-cost">0</span></div>
+                <p class="text-[10px] text-gray-400 mt-1">材料總消耗金額</p>
+            </div>
+            <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-orange-400">
+                <p class="text-gray-400 font-bold text-[10px]">庫存狀態</p>
+                <div id="stock-alerts" class="text-xs font-bold text-gray-700 mt-1">掃描中...</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-2xl shadow-sm p-5 border">
+                    <h3 class="font-bold text-gray-700 mb-4 flex justify-between items-center text-sm">📦 庫存監控 <button onclick="saveInventory()" class="text-[10px] bg-slate-100 px-2 py-1 rounded">更新初始</button></h3>
+                    <div id="inventory-list" class="space-y-4 max-h-[600px] overflow-y-auto pr-1 no-scrollbar"></div>
+                </div>
+            </div>
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-2xl shadow-sm overflow-hidden border">
+                    <div class="p-4 bg-slate-50 border-b font-bold text-gray-700 flex justify-between items-center">
+                        <span>📋 訂單進度管理</span>
+                        <div class="flex gap-2">
+                            <button onclick="markAllReceived()" class="bg-green-500 text-white text-[10px] px-3 py-1 rounded-full hover:bg-green-600 shadow-sm">一鍵已領取 ✓</button>
+                            <button onclick="clearTodayOrders()" class="bg-red-500 text-white text-[10px] px-3 py-1 rounded-full hover:bg-red-600 shadow-sm">清除當日訂單 🗑️</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 text-gray-400 text-[10px] uppercase">
+                                <tr><th class="p-4">號碼/時間</th><th class="p-4">內容</th><th class="p-4">狀態</th><th class="p-4 text-center">切換進度</th></tr>
+                            </thead>
+                            <tbody id="admin-table-body" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-2xl shadow-sm p-5 border border-orange-200">
+                    <h3 class="font-bold text-orange-600 mb-4 text-sm">💰 材料單價設定</h3>
+                    <div id="mat-cost-list" class="space-y-2 mb-4 max-h-60 overflow-y-auto no-scrollbar"></div>
+                    <button onclick="saveMatCosts()" class="w-full bg-orange-500 text-white py-2 rounded-lg font-bold shadow-lg">儲存設定</button>
+                    <hr class="my-6">
+                    <button onclick="clearGlobalHistory()" class="w-full text-red-400 text-[10px] hover:underline">清空全站歷史數據 (慎用)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCJ8WrgSLo2bNzYzY1MIt1EfgEcA0J6eEY",
+            authDomain: "breakfast-4addd.firebaseapp.com",
+            projectId: "breakfast-4addd",
+            storageBucket: "breakfast-4addd.firebasestorage.app",
+            messagingSenderId: "132987657144",
+            appId: "1:132987657144:web:5cdfdc6214e1bec242cd4d",
+            measurementId: "G-TCL5WMLMXY",
+            databaseURL: "https://breakfast-4addd-default-rtdb.europe-west1.firebasedatabase.app/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // 設置今天日期到選擇器 (YYYY-MM-DD)
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        document.getElementById('date-filter').value = `${y}-${m}-${d}`;
+
+        const materials = ["蛋餅皮", "起司", "肉鬆", "玉米", "薯餅", "鮪魚", "豬排", "雞腿排", "卡啦雞", "熱狗", "蛋", "麥克雞塊", "紅茶", "豆漿", "奶茶", "鮮奶"];
+        const recipes = {
+            "蛋餅": { "蛋餅皮": 1, "蛋": 1 }, "漢堡": { "蛋": 1 }, "紅茶": { "紅茶": 1 }, "豆漿": { "豆漿": 1 }, "奶茶": { "奶茶": 1 }, "鮮奶茶": { "紅茶": 1, "鮮奶": 1 },
+            "加蛋": { "蛋": 1 }, "加起司": { "起司": 1 }, "肉鬆": { "肉鬆": 1 }, "玉米": { "玉米": 1 }, "薯餅": { "薯餅": 1 }, "鮪魚": { "鮪魚": 1 }, "豬排": { "豬排": 1 }, "雞腿排": { "雞腿排": 1 }, "卡啦雞": { "卡啦雞": 1 }, "熱狗": { "熱狗": 1 }, "荷包蛋": { "蛋": 1 }, "麥克雞塊": { "麥克雞塊": 1 }
+        };
+
+        function listenToOrders() {
+            db.ref('orders').on('value', (snapshot) => {
+                const firebaseData = snapshot.val() || {};
+                const allOrders = Object.entries(firebaseData).map(([key, value]) => ({ fbKey: key, ...value }));
+                updateDashboard(allOrders);
+            });
+        }
+
+        function updateDashboard(allOrders) {
+            const matCosts = JSON.parse(localStorage.getItem('breakfast_mat_unit_costs') || '{}');
+            const stockSet = JSON.parse(localStorage.getItem('breakfast_stock') || '{}');
+            const selectedDate = document.getElementById('date-filter').value; // YYYY-MM-DD
+            const currentMonth = selectedDate.substring(0, 7);
+
+            let dRev = 0, dNet = 0, dCount = 0, mRev = 0, mNet = 0, mCostTotal = 0;
+            let invUsed = {}, tableHTML = '';
+
+            allOrders.sort((a, b) => b.id - a.id);
+
+            allOrders.forEach(o => {
+                const orderDate = o.date; // 應為 YYYY-MM-DD
+                const oMonth = orderDate ? orderDate.substring(0, 7) : "";
+                let oCost = 0;
+                o.items.split(', ').forEach(str => {
+                    const parts = str.split('x');
+                    const name = parts[0];
+                    const qty = parseInt(parts[1]) || 1;
+                    Object.keys(recipes).forEach(key => {
+                        if (name.includes(key)) {
+                            Object.keys(recipes[key]).forEach(mat => {
+                                const amt = recipes[key][mat] * qty;
+                                oCost += amt * (matCosts[mat] || 0);
+                                if (orderDate === selectedDate) invUsed[mat] = (invUsed[mat] || 0) + amt;
+                            });
+                        }
+                    });
+                });
+
+                const oProfit = o.total - oCost;
+                if (oMonth === currentMonth) { mRev += o.total; mCostTotal += oCost; mNet += oProfit; }
+                if (orderDate === selectedDate) {
+                    dRev += o.total; dNet += oProfit; dCount++;
+                    const sCol = o.status === '已領取' ? 'text-slate-300' : o.status === '可領取' ? 'text-green-600 font-bold' : o.status === '製作中' ? 'text-orange-500 font-bold' : 'text-gray-400';
+                    tableHTML += `<tr>
+                        <td class="p-4 font-bold text-slate-700">#${o.orderNo}<br><span class="text-[9px] text-gray-400 font-normal">${o.time}</span></td>
+                        <td class="p-4 text-xs text-slate-500">${o.items}</td>
+                        <td class="p-4 text-[10px] ${sCol}">${o.status}</td>
+                        <td class="p-4"><div class="flex flex-wrap gap-1 justify-center">
+                            <button onclick="updateStatus('${o.fbKey}','製作中')" class="bg-orange-50 text-orange-500 border border-orange-200 px-2 py-0.5 rounded text-[10px] hover:bg-orange-500 hover:text-white transition">製</button>
+                            <button onclick="updateStatus('${o.fbKey}','可領取')" class="bg-green-50 text-green-500 border border-green-200 px-2 py-0.5 rounded text-[10px] hover:bg-green-500 hover:text-white transition">領</button>
+                            <button onclick="updateStatus('${o.fbKey}','已領取')" class="bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded text-[10px] hover:bg-slate-500 hover:text-white font-bold transition">結</button>
+                        </div></td></tr>`;
+                }
+            });
+
+            document.getElementById('daily-rev').innerText = dRev.toLocaleString();
+            document.getElementById('daily-net').innerText = dNet.toFixed(0);
+            document.getElementById('daily-count').innerText = dCount;
+            document.getElementById('monthly-rev').innerText = mRev.toLocaleString();
+            document.getElementById('monthly-cost').innerText = mCostTotal.toFixed(0);
+            document.getElementById('monthly-net').innerText = mNet.toFixed(0);
+            document.getElementById('admin-table-body').innerHTML = tableHTML || '<tr><td colspan="4" class="p-10 text-center text-gray-400 text-xs">該日期尚無訂單</td></tr>';
+
+            let alertCount = 0;
+            document.getElementById('inventory-list').innerHTML = materials.map(m => {
+                const initial = stockSet[m]?.initial || 100;
+                const current = initial - (invUsed[m] || 0);
+                const ratio = current / initial;
+                if(ratio <= 0.33) alertCount++;
+                return `<div><div class="flex justify-between text-[9px] font-bold mb-1"><span>${m}</span><span class="${ratio<=0.33?'text-red-500':''}">${current}/${initial}</span></div>
+                    <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="${ratio<=0.33?'bg-red-500 low-stock':ratio<=0.5?'bg-orange-500':'bg-emerald-500'} h-full transition-all" style="width:${Math.max(0,ratio*100)}%"></div></div>
+                    <input type="number" data-mat="${m}" value="${initial}" class="stock-input w-full text-[9px] mt-1 border-none bg-slate-50 rounded px-1 outline-none"></div>`;
+            }).join('');
+            document.getElementById('stock-alerts').innerText = alertCount > 0 ? `⚠️ ${alertCount} 項低於 1/3` : '✅ 庫存充足';
+            
+            if(document.getElementById('mat-cost-list').innerHTML === "") {
+                document.getElementById('mat-cost-list').innerHTML = materials.map(m => `<div class="flex justify-between items-center text-xs p-2 bg-slate-50 rounded"><span>${m}</span><input type="number" step="0.1" data-matcost="${m}" value="${matCosts[m]||0}" class="mat-cost-input w-16 text-right rounded border-gray-200 px-1 outline-none"></div>`).join('');
+            }
+        }
+
+        function updateStatus(fbKey, s) { db.ref(`orders/${fbKey}`).update({ status: s }); }
+        function toggleShop() { db.ref('shop_config').once('value', snap => { const current = snap.val() || { isOpen: true }; db.ref('shop_config').set({ isOpen: !current.isOpen }); }); }
+        db.ref('shop_config').on('value', snap => {
+            const c = snap.val() || { isOpen: true }; const b = document.getElementById('toggle-shop-btn');
+            b.innerText = c.isOpen ? "營業中 (點擊暫停接單)" : "休息中 (點擊開啟營業)";
+            b.className = `px-6 py-1.5 rounded-full font-black text-xs transition ${c.isOpen?'bg-green-500 text-white hover:bg-red-500':'bg-red-500 text-white hover:bg-green-500'}`;
+        });
+
+        function markAllReceived() {
+            const selectedDate = document.getElementById('date-filter').value;
+            db.ref('orders').once('value', snapshot => { snapshot.forEach(child => { if (child.val().date === selectedDate) child.ref.update({ status: '已領取' }); }); });
+        }
+        function clearTodayOrders() {
+            const selectedDate = document.getElementById('date-filter').value;
+            if(!confirm(`確定要清除雲端上 ${selectedDate} 的所有訂單嗎？`)) return;
+            db.ref('orders').once('value', snapshot => { snapshot.forEach(child => { if (child.val().date === selectedDate) child.ref.remove(); }); });
+        }
+        function saveMatCosts() {
+            let costs = {}; document.querySelectorAll('.mat-cost-input').forEach(i => costs[i.dataset.matcost] = parseFloat(i.value) || 0);
+            localStorage.setItem('breakfast_mat_unit_costs', JSON.stringify(costs)); alert('單價設定已儲存！'); location.reload();
+        }
+        function saveInventory() {
+            let stock = {}; document.querySelectorAll('.stock-input').forEach(i => stock[i.dataset.mat] = {initial: parseInt(i.value)||0});
+            localStorage.setItem('breakfast_stock', JSON.stringify(stock)); alert('初始庫存量已更新！'); location.reload();
+        }
+        function clearGlobalHistory() { if(confirm("確定清空全站雲端數據？")) { db.ref('orders').remove(); db.ref('last_order_seq').remove(); location.reload(); } }
+
+        document.getElementById('date-filter').addEventListener('change', () => listenToOrders());
+        listenToOrders();
+    </script>
+</body>
+</html>
